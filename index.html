@@ -1,0 +1,1170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Impostor Ship</title>
+<style>
+  :root { --bg: #060914; --card: #141d36; --ink: #eef2ff; --dim: #9aa6c8; --red: #ff4d5e; --gold: #ffd166; --green: #4ee08a; --blue: #4cc3ff; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); }
+  body { font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); user-select: none; -webkit-user-select: none; }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; }
+  [hidden] { display: none !important; }
+  .hud { position: fixed; pointer-events: none; text-shadow: 0 1px 3px #000c; }
+  #tasks { top: max(10px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); width: min(250px, 58vw); }
+  #tasks .lbl { font-size: 11px; font-weight: 800; letter-spacing: .12em; color: var(--dim); margin-bottom: 3px; }
+  #bar { height: 12px; border-radius: 6px; background: #ffffff1c; overflow: hidden; border: 1px solid #ffffff2a; }
+  #bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2fd27a, #a5ff6e); transition: width .5s ease-out; }
+  #role { margin-top: 7px; font-weight: 800; font-size: 13px; letter-spacing: .05em; }
+  #list { margin-top: 3px; font-size: 12.5px; color: #d6def7; }
+  #list .done { color: #6fdc8c; opacity: .75; text-decoration: line-through; }
+  #room { top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); font-weight: 800; font-size: 14px; letter-spacing: .04em; opacity: .85; }
+  #net { bottom: max(10px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); font-size: 12px; opacity: .7; }
+  #msg { left: 0; right: 0; top: 24%; text-align: center; font-weight: 900; font-size: clamp(28px, 6.5vw, 56px); letter-spacing: .04em; padding: 0 16px; }
+  #msg small { display: block; font-size: clamp(14px, 2.6vw, 20px); font-weight: 600; color: #dfe5ff; letter-spacing: 0; margin-top: 8px; }
+  .red { color: var(--red); } .blue { color: var(--blue); } .gold { color: var(--gold); }
+  #hint { left: 0; right: 0; bottom: max(40px, calc(env(safe-area-inset-bottom) + 30px)); text-align: center; font-size: 14px; color: #dfe5ff; padding: 0 110px 0 16px; }
+  #keys { right: max(14px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 8px; font-size: 13px; font-weight: 700; }
+  #keys span { padding: 6px 10px; border-radius: 10px; background: #ffffff12; opacity: .45; }
+  #keys span.on { opacity: 1; background: #ffffff2a; } #keys span.kill.on { background: #ff4d5e66; }
+  .btns { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: 74px 74px; gap: 10px; }
+  .btns button { width: 74px; height: 74px; border-radius: 50%; border: 2px solid #ffffff50; background: #ffffff16; color: #fff; font: 800 12px system-ui, sans-serif; touch-action: none; opacity: .4; }
+  .btns button.on { opacity: 1; background: #ffffff30; }
+  #use { grid-column: 2; grid-row: 2; width: 84px; height: 84px; }
+  #kill.on { background: #ff4d5e70; border-color: #ff98a2; } #report.on { background: #ffd16660; }
+  #lobby { position: fixed; left: 50%; transform: translateX(-50%); top: max(64px, calc(env(safe-area-inset-top) + 54px)); font-size: 14px; color: var(--dim); }
+  #lobby input { margin-left: 8px; width: 150px; height: 40px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff14; color: #fff; padding: 0 10px; font: inherit; font-size: 16px; }
+  .over { position: fixed; inset: 0; display: grid; place-items: center; background: #04060ed6; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); box-sizing: border-box; }
+  .card { width: min(720px, 96vw); max-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid #ffffff22; box-shadow: 0 20px 60px #0008; }
+  .card header { display: flex; align-items: baseline; gap: 10px; }
+  .card h2 { margin: 0; font-size: 20px; }
+  #mTime { margin-left: auto; color: var(--gold); font-weight: 800; white-space: nowrap; }
+  #votes { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px; }
+  #votes button, #skip { min-height: 46px; display: flex; align-items: center; gap: 8px; border-radius: 12px; border: 2px solid transparent; background: #ffffff10; color: #fff; font: 700 14px system-ui, sans-serif; padding: 6px 10px; text-align: left; cursor: pointer; }
+  #votes button:disabled, #skip:disabled { cursor: default; }
+  #votes button.dead { opacity: .32; text-decoration: line-through; }
+  #votes button.mine, #skip.mine { border-color: var(--gold); background: #ffd16626; }
+  #votes .dot { width: 22px; height: 26px; border-radius: 11px 11px 7px 7px; flex: none; box-shadow: inset -4px -3px 0 #0003; }
+  #votes .tag { margin-left: auto; font-size: 11px; color: var(--green); font-weight: 800; }
+  #skip { justify-content: center; }
+  #chat { min-height: 80px; max-height: 26vh; overflow: auto; background: #0004; border-radius: 12px; padding: 8px 10px; font-size: 14px; display: flex; flex-direction: column; gap: 3px; }
+  #chat b { margin-right: 6px; } #chat .sys { color: var(--dim); font-style: italic; }
+  #say { display: flex; gap: 8px; }
+  #say input { flex: 1; min-width: 0; height: 44px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff12; color: #fff; padding: 0 12px; font: inherit; font-size: 16px; }
+  #say button, button.go { min-height: 44px; border: 0; border-radius: 12px; background: var(--green); color: #07140c; font: 800 16px system-ui, sans-serif; padding: 0 18px; cursor: pointer; }
+  #over .card { width: min(380px, 92vw); text-align: center; }
+  #oTitle { font-size: 28px !important; } #oWhy, #oNext { color: var(--dim); } #oImp { font-weight: 700; }
+  #board { text-align: left; margin: 4px 0; padding-left: 26px; font-size: 14px; min-height: 40px; }
+  #board li span { float: right; }
+</style>
+<script src="https://cdn.multiplayeragent.com/sdk/mp.global.js"></script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud" id="tasks" hidden><div class="lbl">SHIP TASKS</div><div id="bar"><i></i></div><div id="role"></div><div id="list"></div></div>
+<div class="hud" id="room"></div>
+<div class="hud" id="msg"></div>
+<div class="hud" id="hint"></div>
+<div class="hud" id="keys" hidden><span id="kUse">E · Use</span><span id="kKill" class="kill">Q · Kill</span><span id="kReport">R · Report</span></div>
+<div class="hud" id="net">Connecting…</div>
+<div class="btns" id="btns" hidden><button id="report">REPORT</button><button id="kill">KILL</button><button id="use">USE</button></div>
+<div id="lobby" hidden><label>Your name<input id="name" maxlength="14" autocomplete="off"></label></div>
+<div class="over" id="meet" hidden><div class="card">
+  <header><h2 id="mTitle"></h2><span id="mTime"></span></header>
+  <div id="votes"></div>
+  <button id="skip">Skip vote</button>
+  <div id="chat"></div>
+  <form id="say"><input id="sayText" maxlength="70" placeholder="Say something…" autocomplete="off"><button>Send</button></form>
+</div></div>
+<div class="over" id="over" hidden><div class="card">
+  <h2 id="oTitle"></h2><div id="oWhy"></div><div id="oImp"></div><div id="oYou" class="gold"></div>
+  <ol id="board"><li>Loading the leaderboard…</li></ol>
+  <button class="go" id="again">Play again</button><div id="oNext"></div>
+</div></div>
+<script>
+/* ═══ IMPOSTOR SHIP · a Multiplayer Agent starter ════════════════════════════════════════
+ * Do your tasks. Find the impostor. Party, 4–10 players; bots fill empty seats.
+ *
+ * WHERE THINGS ARE (search for the "── " headers):
+ *   CONFIG ........ every number worth tuning: timers, ranges, bots
+ *   SHIP MAP ...... the map as rows of text, room names, task spots, the emergency button
+ *   CONNECTION .... MP_CONNECT, joining, the offline room, who is host
+ *   SEALED SECRETS  the Seal helper: a role is encrypted so only its owner can read it
+ *   GAME (HOST) ... phases (lobby, play, meet, eject, over), dealing roles, kills, votes, wins
+ *   BOTS (HOST) ... bots walk to tasks, report bodies, chat and vote; a bot impostor hunts
+ *   ME ............ walking, tasks, kill, report, the button, opening my role
+ *   DRAW .......... the ship, crewmates, bodies, the dark, the ejection
+ *   SCREENS ....... HUD, meeting, results, leaderboard
+ *   INPUT ......... keyboard, drag-to-move stick, touch buttons
+ *
+ * HOW THE MULTIPLAYER WORKS (a relay room: no server code):
+ *   - Each player writes its OWN entity: `p` (packed position) ~12 times a second, `hb`
+ *     (heartbeat) once a second, and `n` (name), `c` (color), `pk` (public key) once.
+ *   - The HOST is the lowest sessionId among live players, worked out every frame. Only the
+ *     host writes the shared fields: `game` (the whole game: phase, timers, roster, dead,
+ *     bodies, meeting, votes, task bar, winner; `v` goes up on every write), `roles` (sealed
+ *     roles), `bots` (bot positions) and `chat` (the recent meeting chat).
+ *   - Roles are HIDDEN: the host seals each player's role to that player's key, so nobody
+ *     else can read it (the host deals, so it knows). When the host changes, every player
+ *     re-sends its own role sealed to the new host ("role"); an impostor role nobody claims
+ *     goes to a living bot, so the game carries on.
+ *   - Intents to the host: "act" (sealed, so a kill and a task look the same), "report",
+ *     "button", "vote", "chat", "ready". The host checks each one and writes the result.
+ *   - ?attract plays offline with bots only (the preview video is recorded from it).
+ *   - Leaderboard "wins": +1 for every game your side wins.
+ */
+
+// ── CONFIG ──────────────────────────────────────────────────────────────────────────
+const CONFIG = {
+  seats: 8,             // bots fill the crew up to this many players (4–10)
+  maxPlayers: 10,       // more humans than this watch until the next game
+  impostors: 1,         // impostors per game
+  tasksEach: 4,         // tasks per crewmate
+  taskMs: 1800,         // hold Use this long to finish a task
+  speed: 200,           // walking speed, px per second
+  vision: 270,          // how far a crewmate sees in the dark, px
+  impVision: 360,       // the impostor sees further
+  useRange: 64,         // reach for tasks and the emergency button, px
+  killRange: 80,        // reach for a kill, px
+  reportRange: 120,     // reach for reporting a body, px
+  killCooldown: 18000,  // ms between kills; it also restarts when play starts and after each meeting
+  introMs: 3500,        // the role splash at the start; nobody moves yet
+  lobbyMs: 6000,        // countdown before a game
+  talkMs: 12000,        // a meeting: talk this long before voting opens…
+  voteMs: 25000,        // …then this long to vote (it ends early once everyone has voted)
+  ejectMs: 5500,        // the ejection screen
+  overMs: 14000,        // the results screen
+  buttonDelay: 12000,   // the emergency button wakes up this long after play (re)starts
+  emergencies: 1,       // button presses per player per game
+  chatLines: 8,         // meeting chat lines kept in state
+  chatMax: 70,          // characters per chat line
+  botKillChance: 0.3,   // per second, while a bot impostor is ready with a crewmate in reach
+  botReportMs: [600, 1800], // how long a bot takes to report a body it walks past
+  board: "wins",        // leaderboard: games won
+};
+const BOT_NAMES = ["Nova", "Sprocket", "Juno", "Rusty", "Pixel", "Comet", "Mochi", "Orbit", "Ziggy", "Bolt"];
+// [name, hue, saturation %, lightness %]
+const COLORS = [["Red", 355, 78, 52], ["Blue", 222, 80, 58], ["Green", 140, 62, 42], ["Pink", 322, 80, 68], ["Orange", 28, 95, 55],
+  ["Yellow", 50, 95, 58], ["Cyan", 184, 78, 50], ["Purple", 272, 68, 62], ["Lime", 92, 70, 50], ["White", 220, 18, 88]];
+const hsl = (ci, dl = 0) => { const c = COLORS[ci] || COLORS[0]; return `hsl(${c[1]},${c[2]}%,${c[3] + dl}%)`; };
+
+// ── SHIP MAP ────────────────────────────────────────────────────────────────────────
+const TILE = 48;
+// One character per tile: a letter is a room's floor (see ROOMS), "." a hallway, " " space.
+const MAP = [
+  "                              ",
+  " EEEEEE    CCCCCCCC    NNNNNN ",
+  " EEEEEE    CCCCCCCC    NNNNNN ",
+  " EEEEEE....CCCCCCCC....NNNNNN ",
+  " EEEEEE....CCCCCCCC....NNNNNN ",
+  " EEEEEE    CCCCCCCC    NNNNNN ",
+  "   ..      CCCCCCCC      ..   ",
+  "   ..         ..         ..   ",
+  " MMMMMM       ..       SSSSSS ",
+  " MMMMMM.....AAAAAA.....SSSSSS ",
+  " MMMMMM.....AAAAAA.....SSSSSS ",
+  " MMMMMM     AAAAAA     SSSSSS ",
+  "   ..       AAAAAA       ..   ",
+  " LLLLLL       ..       OOOOOO ",
+  " LLLLLL    TTTTTTTT    OOOOOO ",
+  " LLLLLL....TTTTTTTT....OOOOOO ",
+  " LLLLLL....TTTTTTTT....OOOOOO ",
+  " LLLLLL    TTTTTTTT    OOOOOO ",
+  "                              ",
+];
+const ROOMS = { E: ["Engine", 215], C: ["Cafeteria", 200], N: ["Navigation", 185], M: ["Medbay", 160], A: ["Admin", 40],
+  S: ["Shields", 255], L: ["Electrical", 48], T: ["Storage", 25], O: ["Comms", 290], ".": ["Hallway", 220] };
+// Task spots, in tiles. Each crewmate gets CONFIG.tasksEach of them (the impostor gets fake ones).
+const TASKS = [
+  { n: "Fuel the engine", x: 2, y: 1 }, { n: "Align the engine", x: 5, y: 5 }, { n: "Empty the trash", x: 17, y: 1 },
+  { n: "Chart a course", x: 27, y: 2 }, { n: "Steer the ship", x: 24, y: 5 }, { n: "Scan your body", x: 2, y: 10 },
+  { n: "Swipe your card", x: 16, y: 12 }, { n: "Prime the shields", x: 27, y: 9 }, { n: "Fix the wiring", x: 1, y: 14 },
+  { n: "Divert power", x: 5, y: 17 }, { n: "Stack the crates", x: 12, y: 17 }, { n: "Download data", x: 27, y: 16 },
+];
+for (const t of TASKS) { t.wx = (t.x + 0.5) * TILE; t.wy = (t.y + 0.5) * TILE; }
+const BUTTON = { x: 15 * TILE, y: 4 * TILE }; // the emergency button, on the cafeteria table
+const MAP_W = MAP[0].length * TILE, MAP_H = MAP.length * TILE, BODY_R = 13;
+const tileAt = (x, y) => (MAP[Math.floor(y / TILE)] || "")[Math.floor(x / TILE)] || " ";
+const floorAt = (x, y) => tileAt(x, y) !== " ";
+const canStand = (x, y) => floorAt(x - BODY_R, y - BODY_R) && floorAt(x + BODY_R, y - BODY_R) && floorAt(x - BODY_R, y + BODY_R) && floorAt(x + BODY_R, y + BODY_R);
+const roomAt = (x, y) => (ROOMS[tileAt(x, y)] || ROOMS["."])[0];
+
+/** A walkable route from a to b (world px): tile steps, then shortcuts where the way is clear. */
+function findPath(a, b) {
+  const cols = MAP[0].length, key = (c, r) => r * cols + c;
+  const start = key(Math.floor(a.x / TILE), Math.floor(a.y / TILE)), goal = key(Math.floor(b.x / TILE), Math.floor(b.y / TILE));
+  const prev = new Map([[start, -1]]), queue = [start];
+  while (queue.length && !prev.has(goal)) {
+    const k = queue.shift(), c = k % cols, r = Math.floor(k / cols);
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const n = key(c + dc, r + dr);
+      if ((MAP[r + dr] || "")[c + dc] > " " && !prev.has(n)) { prev.set(n, k); queue.push(n); }
+    }
+  }
+  if (!prev.has(goal)) return [];
+  const pts = [];
+  for (let k = goal; k !== -1; k = prev.get(k)) pts.unshift({ x: (k % cols + 0.5) * TILE, y: (Math.floor(k / cols) + 0.5) * TILE });
+  pts[pts.length - 1] = { x: b.x, y: b.y };
+  const clear = (p, q) => { const n = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 12); for (let i = 1; i < n; i++) if (!canStand(p.x + (q.x - p.x) * i / n, p.y + (q.y - p.y) * i / n)) return false; return true; };
+  const out = []; let from = a, i = 0;
+  while (i < pts.length) { let j = pts.length - 1; while (j > i && !clear(from, pts[j])) j--; out.push(pts[j]); from = pts[j]; i = j + 1; }
+  return out;
+}
+function randomFloor() {
+  for (;;) { const r = 1 + Math.floor(Math.random() * (MAP.length - 2)), c = 1 + Math.floor(Math.random() * (MAP[0].length - 2)); if (/[A-Z]/.test(MAP[r][c])) return { x: (c + 0.5) * TILE, y: (r + 0.5) * TILE }; }
+}
+
+// ── CONNECTION ──────────────────────────────────────────────────────────────────────
+// The builder fills these in for this game. Downloaded from GitHub? Put your own pk_ key here.
+const MP_CONNECT = {
+  key: 'pk_REPLACE_ME',
+  room: 'impostor-ship',
+  endpoint: 'wss://live.multiplayeragent.com',
+  apiUrl: 'https://api.multiplayeragent.com',
+};
+const ATTRACT = new URLSearchParams(location.search).has("attract");
+
+/** Same shape as the SDK client, kept in this tab: offline play and ?attract. */
+function localRoom() {
+  const id = "local", state = { entities: { players: { [id]: {} } }, shared: {} }, subs = [];
+  let queued = false;
+  const emit = () => { if (!queued) { queued = true; queueMicrotask(() => { queued = false; subs.forEach((f) => f(state)); }); } };
+  const put = (o, k, v) => { if (typeof k === "object") Object.assign(o, k); else o[k] = v; emit(); };
+  return {
+    sessionId: id, state, offline: true,
+    me: { set: (k, v) => put(state.entities.players[id], k, v) },
+    setShared: (k, v) => put(state.shared, k, v),
+    onState: (f) => { subs.push(f); f(state); }, onJoin() {}, onLeave() {}, on() {}, send() {},
+    onDisconnect() {}, onReconnect() {}, leave: async () => {},
+  };
+}
+async function connect() {
+  if (ATTRACT || typeof MP === "undefined") return localRoom();
+  try {
+    const mp = await Promise.race([MP.join({ ...MP_CONNECT }), new Promise((_, no) => setTimeout(() => no(new Error("timed out")), 10000))]);
+    window.mp = mp; // the builder calls window.mp.leave() when the page closes
+    return mp;
+  } catch (e) {
+    console.warn("Playing offline:", e && e.message);
+    return localRoom();
+  }
+}
+const parse = (v, fb) => { if (typeof v !== "string") return fb; try { return JSON.parse(v); } catch { return fb; } };
+const memo = new Map();
+/** A shared JSON field, parsed once per change (read-only: never mutate what this returns). */
+function shared(key, fb, map = (v) => v) {
+  const raw = S.shared[key], m = memo.get(key);
+  if (m && m.raw === raw) return m.v;
+  const v = map(parse(raw, fb));
+  memo.set(key, { raw, v });
+  return v;
+}
+/** A JSON field on a player's entity, parsed once per change. */
+function ent(id, field, fb) {
+  const raw = S.entities.players?.[id]?.[field], k = id + "." + field, m = memo.get(k);
+  if (m && m.raw === raw) return m.v;
+  const v = parse(raw, fb);
+  memo.set(k, { raw, v });
+  return v;
+}
+let net = null, S = { entities: { players: {} }, shared: {} };
+const seenHb = new Map(); // sessionId -> { hb, at } on OUR clock
+/** Players whose heartbeat moved in the last 3s (plus us), sorted by sessionId. */
+function livePlayers() {
+  const now = performance.now(), out = [];
+  for (const [id, p] of Object.entries(S.entities.players || {})) {
+    const s = seenHb.get(id);
+    if (!s || s.hb !== p.hb) seenHb.set(id, { hb: p.hb, at: now });
+    if (id === net.sessionId || now - seenHb.get(id).at < 3000) out.push(id);
+  }
+  return out.sort();
+}
+const isHost = () => livePlayers()[0] === net.sessionId;
+const humans = () => livePlayers().filter((id) => !(ATTRACT && id === net.sessionId));
+const nameOf = (id) => (id === net.sessionId ? myName : String(S.entities.players?.[id]?.n ?? "Player")).slice(0, 14);
+const colorOf = (id) => (id === net.sessionId ? myColor : Number(S.entities.players?.[id]?.c ?? 0));
+const pkOf = (id) => (id === net.sessionId ? Seal.pub : S.entities.players?.[id]?.pk);
+
+// ── SEALED SECRETS ──────────────────────────────────────────────────────────────────
+// Hidden info in a relay room. Everything in room state reaches every client, so a secret
+// (your role) is written SEALED: encrypted so only its one reader can open it. Each player
+// publishes a public key in its own entity (`pk`); the host seals each role to that key and
+// writes the boxes into the shared `roles` field.
+//   - The host deals, so the host can read every role. Fine for friends, not cheat-proof.
+//   - A new host can't open boxes the old host sealed, so on a host change every player
+//     re-sends its own role to the new host (sealed, with mp.send).
+//   - crypto.subtle needs https or localhost. Without it seal()/open() pass the value through.
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const Seal = {
+  pair: null,
+  pub: "",
+  keys: new Map(), // other player's public key -> derived AES key
+  get on() { return !!(window.crypto && crypto.subtle); },
+  /** Make this player's key pair. Returns the public key to publish: me.set("pk", pub). */
+  async init() {
+    if (!this.on) return "";
+    this.pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveKey"]);
+    this.pub = b64(await crypto.subtle.exportKey("raw", this.pair.publicKey));
+    return this.pub;
+  },
+  async key(otherPub) {
+    let k = this.keys.get(otherPub);
+    if (!k) {
+      const theirs = await crypto.subtle.importKey("raw", unb64(otherPub), { name: "ECDH", namedCurve: "P-256" }, false, []);
+      k = await crypto.subtle.deriveKey({ name: "ECDH", public: theirs }, this.pair.privateKey, { name: "AES-GCM", length: 128 }, false, ["encrypt", "decrypt"]);
+      this.keys.set(otherPub, k);
+    }
+    return k;
+  },
+  /** Seal any JSON value so only the holder of `toPub` (and you) can open it. */
+  async seal(toPub, value) {
+    if (!this.on || !toPub || !this.pair) return "p:" + JSON.stringify(value);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await this.key(toPub), new TextEncoder().encode(JSON.stringify(value)));
+    return b64(iv) + "." + b64(ct);
+  },
+  /** Open a box sealed by the player whose public key is `fromPub`. Null if it isn't for you. */
+  async open(fromPub, box) {
+    if (typeof box !== "string") return null;
+    if (box.startsWith("p:")) return JSON.parse(box.slice(2));
+    if (!this.on || !fromPub || !this.pair) return null;
+    try {
+      const [iv, ct] = box.split(".").map(unb64);
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, await this.key(fromPub), ct);
+      return JSON.parse(new TextDecoder().decode(pt));
+    } catch { return null; }
+  },
+};
+
+// ── GAME (HOST) ─────────────────────────────────────────────────────────────────────
+// What only the host knows: everyone's role, who did which task, kill times, the bots.
+const host = { last: null, was: false, roles: new Map(), done: new Map(), lastKill: new Map(), saw: new Map(), bots: new Map(),
+  redealt: new Set(), chat: { m: 0, l: [] }, plan: null, graceUntil: 0, needFill: false, dealing: false, botsRaw: "", lastBots: 0 };
+const heard = new Map(); // roles other players re-sent to me, in case I become host: id -> {g, r, done}
+
+/** The game as state has it, or the host's own newer write that hasn't come back yet. */
+function game() {
+  const g = parse(S.shared.game, null);
+  return host.last && isHost() && (!g || host.last.v > g.v) ? host.last : g;
+}
+function writeGame(g) { g = { ...g, v: (game()?.v ?? 0) + 1 }; host.last = g; net.setShared("game", JSON.stringify(g)); return g; }
+const patch = (changes) => writeGame({ ...game(), ...changes });
+const newGame = (id) => ({ id, ph: "lobby", at: Date.now(), endsAt: Date.now() + CONFIG.lobbyMs, seed: 0, ros: [], dead: [], bodies: [],
+  td: 0, tt: 0, impLeft: 0, em: [], mn: 0, mt: null, ej: null, win: "", why: "", imps: [], ready: [] });
+const rosOf = (g, id) => g && g.ros.find((r) => r.i === id);
+const inGame = (g, id) => !!rosOf(g, id);
+const alive = (g, id) => inGame(g, id) && !g.dead.includes(id);
+const isImp = (id) => host.roles.get(id) === "imp";
+const nameIn = (g, id) => rosOf(g, id)?.n || "Someone";
+
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const hashStr = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+/** A player's task spots (indexes into TASKS): the same on every client, from the game seed. */
+function tasksFor(g, id) {
+  const r = mulberry32(g.seed ^ hashStr(id)), idx = TASKS.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  return idx.slice(0, CONFIG.tasksEach);
+}
+function seatSpot(i, n) { const a = (i / Math.max(1, n)) * Math.PI * 2 - Math.PI / 2; return { x: BUTTON.x + Math.cos(a) * 112, y: BUTTON.y + Math.sin(a) * 84 }; }
+
+/** Become host: take over the game exactly as state has it. Roles come back as players re-send them. */
+function adopt() {
+  host.was = true; host.last = null;
+  const g = game(), mid = g && ["play", "meet", "eject"].includes(g.ph);
+  host.graceUntil = performance.now() + (mid ? 2500 : 0);
+  host.needFill = mid; host.roles = new Map(); host.done = new Map(); host.lastKill = new Map(); host.saw = new Map(); host.redealt = new Set(); host.plan = null;
+  if (g && myRole && myRole.g === g.id) { host.roles.set(net.sessionId, myRole.r); host.done.set(net.sessionId, new Set(me.done)); }
+  for (const [id, h] of heard) if (g && h.g === g.id) { host.roles.set(id, h.r); host.done.set(id, new Set(h.done || [])); }
+  host.chat = parse(S.shared.chat, { m: 0, l: [] });
+  host.bots = new Map();
+  if (g) for (const a of parse(S.shared.bots, [])) host.bots.set(a[0], { ...newBot(a[0], { x: a[1], y: a[2] }), dead: !!a[5], k: a[6] || 0 });
+  if (g) g.ros.forEach((r, i) => { if (r.b && !host.bots.has(r.i)) host.bots.set(r.i, newBot(r.i, seatSpot(i, g.ros.length))); });
+  if (mid && !net.offline) net.send("who", { g: g.id });
+}
+
+/** After a host change: any role nobody re-sent is crew, and a missing impostor goes to a living bot. */
+function fillRoles(g) {
+  host.needFill = false;
+  for (const r of g.ros) if (!host.roles.has(r.i)) host.roles.set(r.i, "crew");
+  const known = g.ros.filter((r) => !g.dead.includes(r.i) && isImp(r.i)).length;
+  const spare = shuffle(g.ros.filter((r) => r.b && !g.dead.includes(r.i) && !isImp(r.i)));
+  for (let k = known; k < g.impLeft && spare.length; k++) { const b = spare.pop().i; host.roles.set(b, "imp"); host.redealt.add(b); }
+}
+/** A role re-sent to me (I am, or may become, the host). */
+function learnRole(id, v) {
+  const g = game();
+  if (!g || v.g !== g.id || !inGame(g, id)) return;
+  host.roles.set(id, v.r); host.done.set(id, new Set(v.done || []));
+  if (v.r === "imp" && host.redealt.size) { const [b] = host.redealt; host.redealt.delete(b); host.roles.set(b, "crew"); } // a late claim: undo a bot stand-in
+}
+
+/** Lobby over: seat everyone, fill with bots, deal sealed roles, start play. */
+async function deal(g) {
+  if (host.dealing) return;
+  host.dealing = true;
+  try {
+    const ps = S.entities.players || {};
+    const hs = humans().filter((id) => ps[id] && (pkOf(id) || !Seal.on)).slice(0, CONFIG.maxPlayers);
+    const nBots = Math.max(0, Math.min(CONFIG.maxPlayers, CONFIG.seats) - hs.length);
+    const used = new Set(hs.map(colorOf)), free = COLORS.map((_, i) => i).filter((i) => !used.has(i)), names = shuffle([...BOT_NAMES]);
+    const ros = hs.map((id) => ({ i: id, n: nameOf(id), c: colorOf(id) }));
+    for (let k = 0; k < nBots; k++) ros.push({ i: "bot" + (k + 1), n: names[k % names.length], c: free[k % free.length] ?? k, b: 1 });
+    const imps = shuffle(ros.map((r) => r.i)).slice(0, CONFIG.impostors);
+    host.roles = new Map(ros.map((r) => [r.i, imps.includes(r.i) ? "imp" : "crew"]));
+    host.done = new Map(); host.lastKill = new Map(); host.saw = new Map(); host.redealt = new Set(); host.needFill = false;
+    const box = {};
+    for (const id of hs) box[id] = await Seal.seal(pkOf(id), { g: g.id, r: host.roles.get(id) });
+    if (!isHost() || game()?.id !== g.id || game()?.ph !== "lobby") return; // the room moved on while we sealed
+    net.setShared("roles", JSON.stringify({ g: g.id, pk: Seal.pub, box }));
+    host.chat = { m: 0, l: [] }; writeChat();
+    const ng = patch({ ph: "play", at: Date.now(), endsAt: 0, seed: (Math.random() * 1e9) | 0, ros, dead: [], bodies: [], td: 0,
+      tt: (ros.length - imps.length) * CONFIG.tasksEach, impLeft: imps.length, em: [], mn: 0, mt: null, ej: null });
+    host.bots = new Map(); seatBots(ng);
+  } finally { host.dealing = false; }
+}
+
+function hostTick(dt) {
+  if (!host.was) adopt();
+  const now = Date.now(), settled = performance.now() >= host.graceUntil;
+  let g = game();
+  if (!g) g = writeGame(newGame(1));
+  if (host.needFill && settled && g.ros.length) fillRoles(g);
+  if (g.ph === "lobby" && now >= g.endsAt) deal(g);
+  if ((g.ph === "play" || g.ph === "meet") && settled) g = dropLeavers(g);
+  if (g.ph === "play") { botsTick(g, dt, now); if (settled && game().ph === "play") checkWin(game()); }
+  else if (g.ph === "meet") {
+    botsMeeting(g, now); g = game();
+    const voters = g.ros.filter((r) => alive(g, r.i));
+    if (settled && (now >= g.endsAt || voters.every((r) => g.mt.votes[r.i]))) tally(g);
+  } else if (g.ph === "eject" && settled && now >= g.endsAt && !checkWin(g)) backToPlay();
+  else if (g.ph === "over" && now >= g.endsAt) { host.bots = new Map(); writeGame(newGame(g.id + 1)); }
+  writeBots();
+}
+
+/** Humans who closed the game mid-round are out (no body). */
+function dropLeavers(g) {
+  const ps = S.entities.players || {};
+  const gone = g.ros.filter((r) => !r.b && !g.dead.includes(r.i) && !ps[r.i]).map((r) => r.i);
+  if (!gone.length) return g;
+  return patch({ dead: [...g.dead, ...gone], impLeft: g.impLeft - gone.filter(isImp).length });
+}
+
+/** The HOST's copy of where someone is (bots from memory, players from their entity). */
+function posOf(id) {
+  if (id === net.sessionId) return me;
+  if (host.bots.has(id) && isHost()) return host.bots.get(id);
+  const p = ent(id, "p", null);
+  return p ? { x: p[0], y: p[1] } : null;
+}
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/** A sealed "act" from a player (already opened): a task or a kill. */
+function onAct(from, d) {
+  const g = game();
+  if (!g || g.ph !== "play" || !d) return;
+  if (d.k === "task") addTask(from, d.s, true);
+  if (d.k === "kill") tryKill(from, d.t);
+}
+function addTask(id, s, checkReach) {
+  const g = game(), set = host.done.get(id) || new Set();
+  if (!inGame(g, id) || isImp(id) || !tasksFor(g, id).includes(s) || set.has(s)) return; // impostors' fake tasks don't count
+  const p = posOf(id);
+  if (checkReach && (!p || Math.hypot(p.x - TASKS[s].wx, p.y - TASKS[s].wy) > CONFIG.useRange + 60)) return;
+  set.add(s); host.done.set(id, set);
+  patch({ td: Math.min(g.tt, g.td + 1) });
+}
+const killReady = (g, id, now) => now >= Math.max(g.at + CONFIG.introMs, host.lastKill.get(id) || 0) + CONFIG.killCooldown;
+function tryKill(killer, target) {
+  const g = game(), now = Date.now();
+  if (!alive(g, killer) || !alive(g, target) || !isImp(killer) || isImp(target) || !killReady(g, killer, now + (host.bots.has(killer) ? 0 : 1500))) return; // 1.5s slack for a player's lag
+  const a = posOf(killer), b = posOf(target);
+  if (!a || !b || dist(a, b) > CONFIG.killRange + 50) return;
+  host.lastKill.set(killer, now);
+  for (const r of g.ros) { // bots that saw it will say so at the meeting
+    const p = r.b && r.i !== killer && r.i !== target && alive(g, r.i) && posOf(r.i);
+    if (p && dist(p, b) < CONFIG.vision) host.saw.set(r.i, killer);
+  }
+  if (host.bots.has(killer)) Object.assign(host.bots.get(killer), { x: b.x, y: b.y, path: [] });
+  if (host.bots.has(target)) Object.assign(host.bots.get(target), { dead: true, path: [], busyUntil: 0 });
+  patch({ dead: [...g.dead, target], bodies: [...g.bodies, [target, Math.round(b.x), Math.round(b.y)]] });
+}
+
+function onReport(from, msg) {
+  const g = game(), body = g && g.bodies.find((b) => b[0] === msg.b), p = posOf(from);
+  if (!g || g.ph !== "play" || !alive(g, from) || !body || !p || Math.hypot(p.x - body[1], p.y - body[2]) > CONFIG.reportRange + 60) return;
+  startMeeting(g, from, "body", body[0], g.em);
+}
+function onButton(from) {
+  const g = game(), p = posOf(from);
+  if (!g || g.ph !== "play" || !alive(g, from) || Date.now() < g.at + CONFIG.buttonDelay || !p || dist(p, BUTTON) > CONFIG.useRange + 60) return;
+  if (g.em.filter((i) => i === from).length >= CONFIG.emergencies) return;
+  startMeeting(g, from, "button", "", [...g.em, from]);
+}
+function startMeeting(g, by, why, body, em) {
+  const t = Date.now();
+  host.chat = { m: g.mn + 1, l: [] }; writeChat();
+  patch({ ph: "meet", em, mn: g.mn + 1, endsAt: t + CONFIG.talkMs + CONFIG.voteMs, mt: { by, why, body, votesAt: t + CONFIG.talkMs, votes: {} } });
+}
+function onVote(from, msg) {
+  const g = game(), t = msg.t;
+  if (!g || g.ph !== "meet" || !alive(g, from) || g.mt.votes[from] || Date.now() < g.mt.votesAt - 500) return;
+  if (t !== "skip" && !alive(g, t)) return;
+  patch({ mt: { ...g.mt, votes: { ...g.mt.votes, [from]: t } } });
+}
+function onChat(from, msg) {
+  const g = game();
+  if (!g || g.ph !== "meet" || !alive(g, from) || typeof msg.t !== "string") return;
+  const text = msg.t.replace(/\s+/g, " ").trim().slice(0, CONFIG.chatMax);
+  if (!text) return;
+  if (host.chat.m !== g.mn) host.chat = { m: g.mn, l: [] };
+  host.chat.l = [...host.chat.l, [from, text]].slice(-CONFIG.chatLines);
+  writeChat();
+}
+const writeChat = () => net.setShared("chat", JSON.stringify(host.chat));
+function onReady(from) {
+  const g = game();
+  if (!g || g.ph !== "over" || g.ready.includes(from)) return;
+  const ready = [...g.ready, from], all = humans().every((id) => ready.includes(id));
+  patch({ ready, endsAt: all ? Math.min(g.endsAt, Date.now() + 1500) : g.endsAt });
+}
+const HANDLERS = { report: onReport, button: onButton, vote: onVote, chat: onChat, ready: onReady };
+/** Ask the host to do something. The host's own intents run right here (mp.send never echoes). */
+function toHost(type, msg) { if (isHost()) HANDLERS[type](net.sessionId, msg); else net.send(type, msg); }
+
+/** Count the votes: most votes is ejected; a tie or a skip win ejects nobody. */
+function tally(g) {
+  const count = {};
+  for (const t of Object.values(g.mt.votes)) count[t] = (count[t] || 0) + 1;
+  let top = "", best = 0, tie = false;
+  for (const [t, n] of Object.entries(count)) { if (n > best) { top = t; best = n; tie = false; } else if (n === best) tie = true; }
+  const out = tie || top === "skip" ? "" : top, wasImp = !!out && isImp(out);
+  if (out && host.bots.has(out)) host.bots.get(out).dead = true;
+  patch({ ph: "eject", endsAt: Date.now() + CONFIG.ejectMs, dead: out ? [...g.dead, out] : g.dead, impLeft: g.impLeft - (wasImp ? 1 : 0), ej: { i: out, imp: wasImp, tie } });
+}
+function backToPlay() {
+  host.saw.clear(); host.plan = null;
+  seatBots(patch({ ph: "play", at: Date.now(), endsAt: 0, bodies: [], mt: null }));
+}
+function checkWin(g) {
+  const live = g.ros.filter((r) => !g.dead.includes(r.i)), imps = live.filter((r) => isImp(r.i)).length, crew = live.length - imps;
+  const [win, why] = g.tt && g.td >= g.tt ? ["crew", "tasks"] : imps === 0 ? ["crew", "caught"] : imps >= crew ? ["imp", "kills"] : [];
+  if (!win) return false;
+  patch({ ph: "over", at: Date.now(), endsAt: Date.now() + CONFIG.overMs, win, why, imps: g.ros.filter((r) => isImp(r.i)).map((r) => r.i), ready: [], mt: null });
+  return true;
+}
+
+// ── BOTS (HOST) ─────────────────────────────────────────────────────────────────────
+const rnd = (a, b) => a + Math.random() * (b - a);
+const newBot = (i, s) => ({ i, x: s.x, y: s.y, f: 1, m: 0, dead: false, k: 0, path: [], busyUntil: 0, task: false, reportAt: 0, hunt: 0 });
+function seatBots(g) {
+  g.ros.forEach((r, i) => {
+    if (!r.b) return;
+    const s = seatSpot(i, g.ros.length), b = host.bots.get(r.i) || newBot(r.i, s);
+    host.bots.set(r.i, Object.assign(b, { x: s.x, y: s.y, path: [], busyUntil: Date.now() + rnd(0, 900), task: false, reportAt: 0 }));
+  });
+}
+function botsTick(g, dt, now) {
+  if (now < g.at + CONFIG.introMs) return;
+  for (const b of host.bots.values()) {
+    if (!b.dead && !isImp(b.i)) botReport(game(), b, now);
+    if (!b.dead && isImp(b.i)) botHunt(game(), b, dt, now);
+    if (game().ph !== "play") return; // a report or a last kill ended play
+    botWalk(game(), b, dt, now);
+  }
+}
+/** Walk the planned path; at a task spot, work on it for a moment. Ghost crew keep doing tasks. */
+function botWalk(g, b, dt, now) {
+  b.m = 0;
+  if (b.dead && isImp(b.i)) return;
+  if (b.busyUntil) {
+    if (now < b.busyUntil) return;
+    b.busyUntil = 0;
+    if (b.task) { b.task = false; const s = tasksFor(g, b.i)[b.k++]; if (s != null) addTask(b.i, s, false); }
+  }
+  if (!b.path.length || (b.hunt && now > b.hunt)) planBot(g, b, now);
+  const p = b.path[0];
+  if (!p) { b.busyUntil = now + 500; return; }
+  const d = dist(b, p), step = CONFIG.speed * (b.hunt ? 1.05 : 0.8) * dt; // a hunting impostor walks faster
+  if (Math.abs(p.x - b.x) > 2) b.f = p.x < b.x ? -1 : 1;
+  if (d <= step) { b.x = p.x; b.y = p.y; b.path.shift(); if (!b.path.length) b.busyUntil = now + (b.task ? rnd(1500, 3000) : rnd(300, 1400)); }
+  else { b.x += ((p.x - b.x) / d) * step; b.y += ((p.y - b.y) / d) * step; b.m = 1; }
+}
+function planBot(g, b, now) {
+  const list = tasksFor(g, b.i);
+  let to = null; b.task = false; b.hunt = 0;
+  if (!b.dead && isImp(b.i) && killReady(g, b.i, now) && (ATTRACT || Math.random() < 0.65)) {
+    const prey = g.ros.filter((r) => alive(g, r.i) && !isImp(r.i)).map((r) => posOf(r.i)).filter(Boolean).sort((p, q) => dist(p, b) - dist(q, b))[0];
+    if (prey) { to = { x: prey.x, y: prey.y }; b.hunt = now + (ATTRACT ? 500 : 1200); }
+  }
+  if (!to && b.k < list.length) { to = { x: TASKS[list[b.k]].wx, y: TASKS[list[b.k]].wy }; b.task = true; }
+  b.path = findPath(b, to || randomFloor());
+}
+function botHunt(g, b, dt, now) {
+  if (!killReady(g, b.i, now) || performance.now() < host.graceUntil) return;
+  const prey = g.ros.filter((r) => r.i !== b.i && alive(g, r.i) && !isImp(r.i)).map((r) => ({ id: r.i, p: posOf(r.i) })).find((v) => v.p && dist(v.p, b) < CONFIG.killRange);
+  if (!prey || Math.random() > CONFIG.botKillChance * dt) return;
+  const seen = g.ros.some((r) => { const p = r.i !== b.i && r.i !== prey.id && alive(g, r.i) && posOf(r.i); return p && dist(p, prey.p) < CONFIG.vision * 0.8; });
+  if (seen && !ATTRACT && Math.random() > 0.08) return; // usually waits for nobody to be watching
+  tryKill(b.i, prey.id);
+}
+function botReport(g, b, now) {
+  const body = g.bodies.find((x) => Math.hypot(x[1] - b.x, x[2] - b.y) < CONFIG.reportRange * 1.4);
+  if (!body) { b.reportAt = 0; return; }
+  if (!b.reportAt) b.reportAt = now + rnd(...CONFIG.botReportMs);
+  else if (now >= b.reportAt) { b.reportAt = 0; onReport(b.i, { b: body[0] }); }
+}
+const SAY = {
+  found: ["Body in {room}!", "I found {dead} in {room}.", "{dead} is dead! {room}!"],
+  saw: ["I saw {killer} do it!", "It was {killer}, I saw it.", "{killer}! I was right there."],
+  any: ["Where?", "I was doing tasks in {room}.", "I didn't see anything.", "Who was near {room}?", "Not me!", "{someone} was acting weird.", "Skip? No info.", "{someone} was with me the whole time."],
+  imp: ["I was in {room} the whole time.", "{someone} is sus.", "Skip, we don't know enough.", "I saw {someone} near {room}."],
+};
+/** Plan the bots' meeting: when each one talks and when it votes. */
+function planMeeting(g, now) {
+  const mt = g.mt, body = g.bodies.find((x) => x[0] === mt.body), acts = [];
+  const others = (id) => g.ros.filter((r) => r.i !== id && alive(g, r.i));
+  for (const r of g.ros) {
+    if (!r.b || !alive(g, r.i)) continue;
+    const saw = host.saw.get(r.i), lines = [];
+    if (r.i === mt.by && body) lines.push(pick(SAY.found));
+    if (saw && alive(g, saw)) lines.push(pick(SAY.saw));
+    if (Math.random() < 0.75) lines.push(pick(isImp(r.i) ? SAY.imp : SAY.any));
+    const fill = (s) => s.replace("{room}", body ? roomAt(body[1], body[2]) : roomAt(randomFloor().x, randomFloor().y)).replace("{dead}", nameIn(g, mt.body))
+      .replace("{killer}", nameIn(g, saw)).replace("{someone}", (pick(others(r.i)) || r).n);
+    lines.forEach((l, k) => acts.push({ i: r.i, at: now + (k === 0 && lines.length > 1 ? rnd(300, 900) : rnd(600, CONFIG.talkMs + CONFIG.voteMs * 0.3)) + k * 1200, say: fill(l) }));
+    acts.push({ i: r.i, at: mt.votesAt + rnd(500, (g.endsAt - mt.votesAt) * 0.75), vote: true });
+  }
+  return { key: g.id + ":" + g.mn, acts };
+}
+function botsMeeting(g, now) {
+  if (!host.plan || host.plan.key !== g.id + ":" + g.mn) host.plan = planMeeting(g, now);
+  for (const a of host.plan.acts) if (!a.done && now >= a.at) { a.done = true; if (a.say) onChat(a.i, { t: a.say }); else onVote(a.i, { t: botVote(game(), a.i) }); }
+}
+function botVote(g, id) {
+  const saw = host.saw.get(id);
+  if (saw && alive(g, saw)) return saw;
+  const others = g.ros.filter((r) => r.i !== id && alive(g, r.i)).map((r) => r.i), count = {};
+  for (const t of Object.values(g.mt.votes)) if (t !== "skip") count[t] = (count[t] || 0) + 1;
+  const lead = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+  if (isImp(id)) return lead && lead[0] !== id ? lead[0] : Math.random() < 0.4 ? "skip" : pick(others.filter((o) => !isImp(o))) || "skip";
+  if (lead && lead[0] !== id && lead[1] >= 2 && Math.random() < 0.6) return lead[0];
+  return Math.random() < 0.5 ? "skip" : pick(others);
+}
+function writeBots() {
+  const now = performance.now();
+  if (now - host.lastBots < 90) return; // ~10/s, and only when something moved
+  host.lastBots = now;
+  const raw = JSON.stringify([...host.bots.values()].map((b) => [b.i, Math.round(b.x), Math.round(b.y), b.f, b.m, b.dead ? 1 : 0, b.k]));
+  if (raw !== host.botsRaw) { host.botsRaw = raw; net.setShared("bots", raw); }
+}
+
+// ── ME ──────────────────────────────────────────────────────────────────────────────
+const me = { x: BUTTON.x, y: BUTTON.y + 100, f: 1, m: 0, done: new Set(), hold: 0, near: null, lastKill: 0, pendingKill: "", seatKey: "", gameId: 0, lastSend: 0, lastP: "", diedAt: 0 };
+let myRole = null, opening = false; // { g, r } once my sealed role is opened: r = "imp" | "crew"
+const FRIENDLY = ["Cosmo", "Pip", "Rocket", "Biscuit", "Maple", "Sunny", "Pickle", "Wren", "Taco", "Echo"];
+let myName = "", myColor = 0;
+try { myName = localStorage.getItem("mpa-name") || ""; } catch {}
+if (!myName) myName = pick(FRIENDLY) + " " + (10 + Math.floor(Math.random() * 90));
+const iAmImp = (g) => !!g && myRole?.g === g.id && myRole.r === "imp";
+
+function myTick(g, dt) {
+  if (g.id !== me.gameId) { me.gameId = g.id; me.done.clear(); me.lastKill = 0; me.pendingKill = ""; me.diedAt = 0; }
+  seatMe(g);
+  openRole(g);
+  const canMove = !ATTRACT && (g.ph === "lobby" || (g.ph === "play" && Date.now() >= g.at + CONFIG.introMs));
+  const [vx, vy] = canMove ? moveInput() : [0, 0], step = CONFIG.speed * dt;
+  me.m = vx || vy ? 1 : 0;
+  if (Math.abs(vx) > 0.1) me.f = vx < 0 ? -1 : 1;
+  if (canStand(me.x + vx * step, me.y)) me.x += vx * step;
+  if (canStand(me.x, me.y + vy * step)) me.y += vy * step;
+  if (me.pendingKill && g.dead.includes(me.pendingKill)) { // my kill landed: step onto the body
+    const b = g.bodies.find((x) => x[0] === me.pendingKill);
+    if (b) { me.x = b[1]; me.y = b[2]; }
+    me.pendingKill = "";
+  }
+  taskTick(g, dt);
+  publish(false);
+}
+/** Back to my seat at the table whenever play (re)starts, and into the cafeteria for a new lobby. */
+function seatMe(g) {
+  const key = g.ph === "play" ? g.id + ":" + g.mn : g.ph === "lobby" ? g.id + ":lobby" : me.seatKey;
+  if (key === me.seatKey) return;
+  me.seatKey = key;
+  const i = g.ros.findIndex((r) => r.i === net.sessionId);
+  const s = g.ph === "play" && i >= 0 ? seatSpot(i, g.ros.length) : { x: BUTTON.x + rnd(-150, 150), y: BUTTON.y + rnd(64, 118) };
+  if (canStand(s.x, s.y)) { me.x = s.x; me.y = s.y; }
+  publish(true);
+}
+function openRole(g) {
+  const R = shared("roles", null);
+  if (!R || R.g !== g.id || myRole?.g === g.id || opening || !R.box || !R.box[net.sessionId]) return;
+  opening = true;
+  Seal.open(R.pk, R.box[net.sessionId]).then((v) => { if (v && v.g === g.id) myRole = v; }).finally(() => { opening = false; });
+}
+function taskTick(g, dt) {
+  me.near = null;
+  if (g.ph !== "play" || !inGame(g, net.sessionId) || Date.now() < g.at + CONFIG.introMs) { me.hold = 0; return; }
+  const s = tasksFor(g, net.sessionId).find((k) => !me.done.has(k) && Math.hypot(TASKS[k].wx - me.x, TASKS[k].wy - me.y) < CONFIG.useRange);
+  me.near = s ?? null;
+  if (s == null || !useHeld() || me.m) { me.hold = 0; return; }
+  me.hold += dt * 1000;
+  if (me.hold < CONFIG.taskMs) return;
+  me.hold = 0; me.done.add(s);
+  sendAct({ k: "task", s }); // the impostor sends these too: the host ignores fake ones
+  burst(TASKS[s].wx, TASKS[s].wy, "#7dffa8", 22); tone(880, 140); setTimeout(() => tone(1320, 160), 120);
+}
+/** A kill or a task, sealed to the host so the other players can't tell which it was. */
+async function sendAct(d) {
+  if (isHost()) return onAct(net.sessionId, d);
+  const to = livePlayers()[0], pk = pkOf(to);
+  if (pk) net.send("act", { to, box: await Seal.seal(pk, d) });
+}
+function pressUse() {
+  const g = game();
+  if (g && g.ph === "play" && alive(g, net.sessionId) && dist(me, BUTTON) < CONFIG.useRange + 10 && buttonReady(g)) toHost("button", { b: 1 });
+}
+const buttonReady = (g) => Date.now() >= g.at + CONFIG.buttonDelay && g.em.filter((i) => i === net.sessionId).length < CONFIG.emergencies;
+const myKillWait = (g) => Math.max(g.at + CONFIG.introMs, me.lastKill) + CONFIG.killCooldown - Date.now();
+function killTarget(g) {
+  if (!g || g.ph !== "play" || !iAmImp(g) || !alive(g, net.sessionId)) return null;
+  let best = null, bd = CONFIG.killRange;
+  for (const a of ACTORS) if (a.id !== net.sessionId && !a.dead && dist(a, me) < bd) { bd = dist(a, me); best = a; }
+  return best;
+}
+function tryMyKill() {
+  const g = game(), t = killTarget(g);
+  if (!t || myKillWait(g) > 0) return;
+  me.lastKill = Date.now(); me.pendingKill = t.id;
+  sendAct({ k: "kill", t: t.id });
+}
+const bodyNear = (g) => (g && g.ph === "play" && alive(g, net.sessionId) ? g.bodies.find((b) => Math.hypot(b[1] - me.x, b[2] - me.y) < CONFIG.reportRange) : null);
+function tryReport() { const b = bodyNear(game()); if (b) toHost("report", { b: b[0] }); }
+function publish(force) {
+  const now = performance.now();
+  if (!force && now - me.lastSend < 80) return; // ~12/s
+  const p = JSON.stringify([Math.round(me.x), Math.round(me.y), me.f, me.m]);
+  if (!force && p === me.lastP && now - me.lastSend < 1000) return;
+  me.lastSend = now; me.lastP = p;
+  net.me.set("p", p);
+}
+/** When the host changes, hand my role (and my finished tasks) to the new one, sealed. */
+let lastHost = "";
+function watchHost() {
+  const h = livePlayers()[0];
+  if (h === lastHost) return;
+  lastHost = h;
+  if (h && h !== net.sessionId) resendRole(h);
+}
+async function resendRole(to) {
+  const g = game(), pk = pkOf(to);
+  if (!g || !pk || myRole?.g !== g.id || net.offline) return;
+  net.send("role", { to, box: await Seal.seal(pk, { g: g.id, r: myRole.r, done: [...me.done] }) });
+}
+
+// ── DRAW ────────────────────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const cv = $("game"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function fit() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; }
+addEventListener("resize", fit); addEventListener("orientationchange", fit); fit();
+const cam = { x: BUTTON.x, y: BUTTON.y, z: 1, snap: true };
+const STARS = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random(), z: 0.3 + Math.random() * 0.7 }));
+const rr = (c, x, y, w, h, r) => { c.beginPath(); c.roundRect(x, y, w, h, r); c.fill(); };
+const shipArt = drawShip();
+
+/** The ship, drawn once into an offscreen canvas: floors, hull walls, room names, task consoles. */
+function drawShip() {
+  const c = document.createElement("canvas"), k = 2, x = c.getContext("2d");
+  c.width = MAP_W * k; c.height = MAP_H * k; x.scale(k, k);
+  const floor = (r, q) => (MAP[r] || "")[q] > " ";
+  for (let r = 0; r < MAP.length; r++) for (let q = 0; q < MAP[r].length; q++) {
+    if (!floor(r, q)) continue;
+    const ch = MAP[r][q], hue = (ROOMS[ch] || ROOMS["."])[1], hall = ch === ".";
+    x.fillStyle = `hsl(${hue},${hall ? 12 : 24}%,${hall ? 15 : 21}%)`; x.fillRect(q * TILE, r * TILE, TILE, TILE);
+    x.fillStyle = `hsl(${hue},${hall ? 12 : 24}%,${hall ? 18 : 25}%)`; x.fillRect(q * TILE + 2, r * TILE + 2, TILE - 4, TILE - 4);
+  }
+  for (let r = 0; r < MAP.length; r++) for (let q = 0; q < MAP[r].length; q++) {
+    if (!floor(r, q)) continue;
+    const X = q * TILE, Y = r * TILE;
+    x.fillStyle = "#33426b";
+    if (!floor(r - 1, q)) { x.fillRect(X - 3, Y - 14, TILE + 6, 14); x.fillStyle = "#52669a"; x.fillRect(X - 3, Y - 4, TILE + 6, 4); x.fillStyle = "#33426b"; }
+    if (!floor(r + 1, q)) x.fillRect(X - 3, Y + TILE, TILE + 6, 7);
+    if (!floor(r, q - 1)) x.fillRect(X - 7, Y - 3, 7, TILE + 6);
+    if (!floor(r, q + 1)) x.fillRect(X + TILE, Y - 3, 7, TILE + 6);
+  }
+  const box = {};
+  MAP.forEach((row, r) => [...row].forEach((ch, q) => { if (/[A-Z]/.test(ch)) { const b = box[ch] || (box[ch] = { x0: q, x1: q, y0: r, y1: r }); b.x0 = Math.min(b.x0, q); b.x1 = Math.max(b.x1, q); b.y0 = Math.min(b.y0, r); b.y1 = Math.max(b.y1, r); } }));
+  x.font = "800 15px system-ui, sans-serif"; x.textAlign = "center"; x.fillStyle = "#ffffff30";
+  for (const [ch, b] of Object.entries(box)) x.fillText(ROOMS[ch][0].toUpperCase(), (b.x0 + b.x1 + 1) / 2 * TILE, (b.y1 + 1) * TILE - 12);
+  for (const t of TASKS) { x.fillStyle = "#1a2440"; rr(x, t.wx - 16, t.wy - 12, 32, 22, 5); x.fillStyle = "#4cc3ff55"; rr(x, t.wx - 11, t.wy - 8, 22, 12, 3); }
+  x.fillStyle = "#3c3256"; x.beginPath(); x.arc(BUTTON.x, BUTTON.y, 46, 0, Math.PI * 2); x.fill();
+  x.fillStyle = "#4b406a"; x.beginPath(); x.arc(BUTTON.x, BUTTON.y, 40, 0, Math.PI * 2); x.fill();
+  return c;
+}
+
+function drawBean(x, y, ci, f, moving, alpha, now) {
+  const step = moving ? Math.sin(now / 65) : 0;
+  ctx.save(); ctx.translate(x, y); ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(0, 19, 15, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.translate(0, -Math.abs(step) * 2.5); ctx.scale(f || 1, 1);
+  ctx.fillStyle = hsl(ci, -18); rr(ctx, -20, -8, 10, 19, 4);
+  ctx.fillStyle = hsl(ci, -8); rr(ctx, -11, 6, 10, 13 + step * 3, 4); rr(ctx, 3, 6, 10, 13 - step * 3, 4);
+  ctx.fillStyle = hsl(ci); rr(ctx, -13, -21, 27, 34, 13);
+  ctx.fillStyle = "rgba(0,0,0,.18)"; rr(ctx, -13, 2, 27, 11, [0, 0, 10, 10]);
+  ctx.fillStyle = "#9fdcf5"; ctx.beginPath(); ctx.ellipse(5, -9, 9.5, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ecfbff"; ctx.beginPath(); ctx.ellipse(8, -11, 3.6, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function drawBody(x, y, ci) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.fillStyle = "#b3122899"; ctx.beginPath(); ctx.ellipse(0, 12, 24, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = hsl(ci, -8); rr(ctx, -11, 4, 10, 11, 4); rr(ctx, 3, 4, 10, 11, 4);
+  ctx.fillStyle = hsl(ci); rr(ctx, -13, -4, 27, 14, [3, 3, 10, 10]);
+  ctx.fillStyle = "#e23a4e"; ctx.beginPath(); ctx.ellipse(0.5, -4, 13.5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#f4efe4"; ctx.fillRect(-2, -14, 4, 10); ctx.beginPath(); ctx.arc(-2.5, -15, 3, 0, 7); ctx.arc(2.5, -15, 3, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+let ACTORS = []; // everyone to draw this frame: {id, n, ci, x, y, f, m, dead, bot}
+const view = new Map(); // smoothed positions of other players
+function updateActors(g, dt) {
+  const out = [], list = g && g.ph !== "lobby" && g.ros.length ? g.ros : humans().map((i) => ({ i, n: nameOf(i), c: colorOf(i) }));
+  const bots = isHost() ? null : shared("bots", [], (l) => new Map(l.map((a) => [a[0], { x: a[1], y: a[2], f: a[3], m: a[4] }])));
+  for (const r of list) {
+    let p;
+    if (r.i === net.sessionId) p = me;
+    else if (r.b) p = bots ? bots.get(r.i) : host.bots.get(r.i);
+    else { const q = ent(r.i, "p", null); p = q && { x: q[0], y: q[1], f: q[2], m: q[3] }; }
+    if (!p) continue;
+    let v = view.get(r.i);
+    if (!v || r.i === net.sessionId || (bots === null && r.b) || Math.hypot(p.x - v.x, p.y - v.y) > 160) v = { x: p.x, y: p.y };
+    else { const k = 1 - Math.exp(-dt * 12); v = { x: v.x + (p.x - v.x) * k, y: v.y + (p.y - v.y) * k }; }
+    view.set(r.i, v);
+    out.push({ id: r.i, n: r.n, ci: r.c, x: v.x, y: v.y, f: p.f, m: p.m, dead: !!g && g.ph !== "lobby" && g.dead.includes(r.i), bot: !!r.b });
+  }
+  ACTORS = out;
+}
+
+function draw(g, now) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#050812"; ctx.fillRect(0, 0, W, H);
+  for (const s of STARS) { ctx.fillStyle = `rgba(200,215,255,${s.z * 0.7})`; ctx.fillRect(((s.x * W - cam.x * s.z * 0.15) % W + W) % W, ((s.y * H - cam.y * s.z * 0.15) % H + H) % H, s.z * 2, s.z * 2); }
+  if (g && g.ph === "eject") return drawEject(g, now);
+  const star = ATTRACT && [...host.bots.values()].find((b) => isImp(b.i) && !b.dead); // the preview follows the impostor
+  const z = Math.max(0.6, Math.min(1.5, Math.min(W, H) / (ATTRACT ? 560 : 620)));
+  const fx = ATTRACT ? (star ? star.x : MAP_W / 2) : me.x, fy = ATTRACT ? (star ? star.y : MAP_H / 2) : me.y;
+  if (cam.snap || (star && cam.star !== star.i)) { cam.x = fx; cam.y = fy; cam.snap = false; cam.star = star && star.i; }
+  cam.x += (fx - cam.x) * (ATTRACT ? 0.06 : 0.18); cam.y += (fy - cam.y) * (ATTRACT ? 0.06 : 0.18); cam.z = z;
+  ctx.setTransform(DPR * z, 0, 0, DPR * z, DPR * (W / 2 - cam.x * z), DPR * (H / 2 - cam.y * z));
+  ctx.drawImage(shipArt, 0, 0, MAP_W, MAP_H);
+  const playing = g && g.ph !== "lobby", mine = inGame(g, net.sessionId);
+  const ghostView = !ATTRACT && playing && (!mine || !alive(g, net.sessionId));
+  const dark = !ATTRACT && playing && mine && alive(g, net.sessionId) && g.ph === "play";
+  const reach = iAmImp(g) ? CONFIG.impVision : CONFIG.vision, seen = (p) => !dark || dist(p, me) < reach + 30;
+  // the emergency button
+  const ready = g && g.ph === "play" && alive(g, net.sessionId) && buttonReady(g) && dist(me, BUTTON) < CONFIG.useRange + 10;
+  ctx.fillStyle = ready ? `rgba(255,77,94,${0.35 + Math.sin(now / 150) * 0.2})` : "#ff4d5e33"; ctx.beginPath(); ctx.arc(BUTTON.x, BUTTON.y, 22, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e0263c"; ctx.beginPath(); ctx.arc(BUTTON.x, BUTTON.y, 13, 0, 7); ctx.fill();
+  ctx.fillStyle = "#ff8a96"; ctx.beginPath(); ctx.arc(BUTTON.x - 3, BUTTON.y - 4, 4, 0, 7); ctx.fill();
+  if (g) for (const b of g.bodies) if (seen({ x: b[1], y: b[2] })) drawBody(b[1], b[2], rosOf(g, b[0])?.c ?? 0);
+  const shown = ACTORS.filter((a) => (a.dead ? ghostView || a.id === net.sessionId : a.id === net.sessionId || seen(a))).sort((a, b) => a.y - b.y);
+  for (const a of shown) drawBean(a.x, a.y, a.ci, a.f, a.m, a.dead ? 0.42 : 1, now);
+  if (!ATTRACT) {
+    ctx.font = "700 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.lineWidth = 3; ctx.strokeStyle = "#000b";
+    for (const a of shown) { ctx.strokeText(a.n, a.x, a.y - 30); ctx.fillStyle = a.id === net.sessionId ? "#ffd166" : a.dead ? "#ffffff88" : "#fff"; ctx.fillText(a.n, a.x, a.y - 30); }
+  }
+  drawParticles();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const sx = (me.x - cam.x) * z + W / 2, sy = (me.y - cam.y) * z + H / 2;
+  if (dark) {
+    const r = reach * z, grd = ctx.createRadialGradient(sx, sy, r * 0.5, sx, sy, r);
+    grd.addColorStop(0, "rgba(3,5,12,0)"); grd.addColorStop(1, "rgba(3,5,12,0.94)");
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+  }
+  if (g && g.ph === "play" && mine && !ATTRACT) drawTaskMarks(g, z, now);
+  if (stick.on && touchUI) { ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(stick.x0, stick.y0, 50, 0, 7); ctx.stroke(); ctx.fillStyle = "#ffffff55"; ctx.beginPath(); ctx.arc(stick.x0 + stick.dx * 50, stick.y0 + stick.dy * 50, 22, 0, 7); ctx.fill(); }
+}
+/** Yellow markers on my unfinished tasks, drawn over the dark; arrows at the edge for far ones. */
+function drawTaskMarks(g, z, now) {
+  for (const s of tasksFor(g, net.sessionId)) {
+    if (me.done.has(s)) continue;
+    const t = TASKS[s], x = (t.wx - cam.x) * z + W / 2, y = (t.wy - cam.y) * z + H / 2, bob = Math.sin(now / 200 + s) * 3;
+    if (x > 20 && x < W - 20 && y > 20 && y < H - 20) {
+      ctx.fillStyle = "#ffd166"; ctx.font = "900 20px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", x, y - 18 * z + bob);
+      if (me.near === s && me.hold > 0) { ctx.strokeStyle = "#7dffa8"; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(x, y, 26, -Math.PI / 2, -Math.PI / 2 + (me.hold / CONFIG.taskMs) * Math.PI * 2); ctx.stroke(); }
+    } else {
+      const a = Math.atan2(y - H / 2, x - W / 2), c = Math.cos(a), sn = Math.sin(a);
+      const k = Math.min((W / 2 - 26) / Math.abs(c || 1e-6), (H / 2 - 26) / Math.abs(sn || 1e-6)); // to the screen's edge
+      ctx.save(); ctx.translate(W / 2 + c * k, H / 2 + sn * k); ctx.rotate(a);
+      ctx.fillStyle = "#ffd166cc"; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-7, -8); ctx.lineTo(-7, 8); ctx.fill(); ctx.restore();
+    }
+  }
+}
+/** The ejection: the voted crewmate tumbles across space. */
+function drawEject(g, now) {
+  const t = Math.min(1, (Date.now() - (g.endsAt - CONFIG.ejectMs)) / (CONFIG.ejectMs * 0.85));
+  for (const s of STARS) { ctx.fillStyle = `rgba(255,255,255,${s.z})`; ctx.fillRect(((s.x * W - now * 0.12 * s.z) % W + W) % W, s.y * H, s.z * 3, s.z * 1.5); }
+  const r = g.ej && g.ej.i && rosOf(g, g.ej.i);
+  if (!r) return;
+  ctx.save(); ctx.translate(-80 + (W + 160) * t, H * 0.6 + Math.sin(t * 7) * 14); ctx.rotate(t * 10); ctx.scale(1.8, 1.8);
+  drawBean(0, 0, r.c, 1, 0, 1, now); ctx.restore();
+}
+const parts = [];
+function burst(x, y, color, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 7, s = rnd(40, 200); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, color }); } }
+function drawParticles() {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.life -= 0.025; p.x += p.vx / 60; p.y += p.vy / 60; p.vx *= 0.94; p.vy *= 0.94;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 2 + p.life * 3, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Two players picked one color (they joined at once): the later sessionId picks another. */
+function fixColor() {
+  const ps = S.entities.players || {};
+  if (!Object.entries(ps).some(([id, p]) => id < net.sessionId && Number(p.c) === myColor)) return;
+  const taken = new Set(Object.entries(ps).filter(([id]) => id !== net.sessionId).map(([, p]) => Number(p.c)));
+  myColor = Math.max(0, COLORS.findIndex((_, i) => !taken.has(i)));
+  net.me.set("c", myColor);
+}
+
+// ── SCREENS ─────────────────────────────────────────────────────────────────────────
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const dot = (ci) => `<span class="dot" style="background:${hsl(ci)};display:inline-block;width:14px;height:16px;border-radius:7px 7px 4px 4px;vertical-align:-2px;margin-right:4px"></span>`;
+let AC = null;
+function unlockAudio() { if (!AC && !ATTRACT) try { AC = new AudioContext(); } catch {} }
+function tone(f, ms, type = "sine", vol = 0.05) {
+  if (!AC) return;
+  const o = AC.createOscillator(), gn = AC.createGain(), t = AC.currentTime;
+  o.type = type; o.frequency.value = f; gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+  o.connect(gn).connect(AC.destination); o.start(t); o.stop(t + ms / 1000);
+}
+/** Sounds and sparks for what just changed in state (effects only: nothing here decides anything). */
+const seenFx = { bodies: 0, mn: 0, dead: false, ph: "" };
+function effects(g) {
+  for (const b of g.bodies.slice(seenFx.bodies)) {
+    if (ATTRACT || !alive(g, net.sessionId) || Math.hypot(b[1] - me.x, b[2] - me.y) < CONFIG.impVision) { burst(b[1], b[2], "#ff4d5e", 30); tone(70, 380, "sawtooth", 0.08); }
+  }
+  seenFx.bodies = g.bodies.length;
+  if (g.ph === "meet" && seenFx.mn !== g.mn) { tone(520, 160, "square"); setTimeout(() => tone(520, 160, "square"), 240); }
+  seenFx.mn = g.mn;
+  const deadNow = g.ph !== "lobby" && inGame(g, net.sessionId) && g.dead.includes(net.sessionId);
+  if (deadNow && !seenFx.dead && g.ph === "play") me.diedAt = Date.now();
+  seenFx.dead = deadNow;
+  if (g.ph === "over" && seenFx.ph !== "over") tone(iAmImp(g) === (g.win === "imp") ? 660 : 220, 500, "triangle", 0.07);
+  seenFx.ph = g.ph;
+}
+
+function banner(g) {
+  const t = Date.now(), secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
+  if (g.ph === "lobby") return ATTRACT ? "" : `Launching in ${secs(g.endsAt - t)}<small>Bots fill the empty seats. Up to ${CONFIG.maxPlayers} can play.</small>`;
+  if (g.ph === "play") {
+    if (!inGame(g, net.sessionId)) return ATTRACT || t > g.at + 6000 ? "" : `Game in progress<small>You'll join the next one. Watch as a ghost.</small>`;
+    if (t < g.at + CONFIG.introMs && g.mn === 0) return !myRole || myRole.g !== g.id ? "Shhh…<small>Dealing roles</small>"
+      : myRole.r === "imp" ? `<span class="red">IMPOSTOR</span><small>Kill the crew. Don't get caught.</small>` : `<span class="blue">CREWMATE</span><small>There is ${g.impLeft} impostor among us. Do your tasks.</small>`;
+    if (me.diedAt && t - me.diedAt < 3500) return `<span class="red">You were killed</span><small>Finish your tasks as a ghost.</small>`;
+    return "";
+  }
+  if (g.ph === "meet" && t < g.mt.votesAt - CONFIG.talkMs + 1300) return g.mt.why === "body" ? `<span class="red">DEAD BODY REPORTED</span>` : `<span class="red">EMERGENCY MEETING</span>`;
+  if (g.ph === "eject") {
+    const e = g.ej, n = esc(nameIn(g, e.i)), late = t > g.endsAt - CONFIG.ejectMs * 0.6, left = `${g.impLeft} impostor${g.impLeft === 1 ? "" : "s"} remain${g.impLeft === 1 ? "s" : ""}.`;
+    if (!e.i) return `No one was ejected.<small>${e.tie ? "It was a tie." : "The crew skipped."} ${late ? left : ""}</small>`;
+    return `${n} was ejected.<small>${late ? `${n} was ${e.imp ? "" : "not "}The Impostor. ${left}` : "&nbsp;"}</small>`;
+  }
+  return "";
+}
+
+let meetSig = "", chatRaw = "", overFor = -1, myVote = "";
+function hud(g) {
+  const n = humans().length;
+  $("net").textContent = ATTRACT ? "" : net.offline ? "Offline: playing with bots" : `Online · ${n} player${n === 1 ? "" : "s"}${isHost() ? " · you run the ship" : ""}`;
+  if (!g) return;
+  if (g.ph === "lobby") fixColor();
+  const t = Date.now(), mine = inGame(g, net.sessionId), amAlive = alive(g, net.sessionId), imp = iAmImp(g), m = $("msg"), html = banner(g);
+  if (m.innerHTML !== html) m.innerHTML = html;
+  $("tasks").hidden = ATTRACT || g.ph === "lobby" || g.ph === "over";
+  $("bar").firstElementChild.style.width = (g.tt ? (100 * g.td) / g.tt : 0) + "%";
+  const wait = Math.ceil(myKillWait(g) / 1000);
+  $("role").innerHTML = !mine ? "WATCHING · next game soon" : !amAlive ? "GHOST · finish your tasks" : imp ? `<span class="red">IMPOSTOR</span> · ${wait > 0 ? "kill in " + wait + "s" : "kill ready"}` : `<span class="blue">CREWMATE</span>`;
+  $("list").innerHTML = !mine || (!amAlive && imp) ? "" : (imp ? "<div>Fake tasks, to blend in:</div>" : "") +
+    tasksFor(g, net.sessionId).map((s) => `<div class="${me.done.has(s) ? "done" : ""}">${me.done.has(s) ? "✓" : "•"} ${TASKS[s].n} <span style="opacity:.6">(${roomAt(TASKS[s].wx, TASKS[s].wy)})</span></div>`).join("");
+  $("room").textContent = ATTRACT || g.ph !== "play" ? "" : roomAt(me.x, me.y);
+  const hintOn = !ATTRACT && (g.ph === "lobby" || (g.ph === "play" && g.mn === 0 && t < g.at + 15000));
+  $("hint").textContent = !hintOn ? "" : touchUI ? "Drag anywhere to walk · hold USE at a yellow ! · REPORT a body you find" : "WASD or arrows to walk · hold E at a yellow ! · R to report a body · E at the red button calls a meeting";
+  const canUse = g.ph === "play" && mine && (me.near != null || (amAlive && buttonReady(g) && dist(me, BUTTON) < CONFIG.useRange + 10));
+  const canKill = !!killTarget(g) && wait <= 0, canReport = !!bodyNear(g);
+  $("btns").hidden = !touchUI || ATTRACT || g.ph !== "play" || !mine;
+  $("keys").hidden = touchUI || ATTRACT || g.ph !== "play" || !mine;
+  $("use").classList.toggle("on", canUse); $("kUse").classList.toggle("on", canUse);
+  $("report").classList.toggle("on", canReport); $("kReport").classList.toggle("on", canReport);
+  $("kill").hidden = $("kKill").hidden = !imp || !amAlive;
+  $("kill").classList.toggle("on", canKill); $("kKill").classList.toggle("on", canKill);
+  $("kill").textContent = wait > 0 ? `KILL ${wait}` : "KILL"; $("kKill").textContent = wait > 0 ? `Q · Kill ${wait}s` : "Q · Kill";
+  $("lobby").hidden = ATTRACT || g.ph !== "lobby";
+  renderMeeting(g);
+  renderOver(g);
+}
+
+function renderMeeting(g) {
+  const t = Date.now(), show = g.ph === "meet" && t >= g.mt.votesAt - CONFIG.talkMs + 1300;
+  $("meet").hidden = !show;
+  if (!show) { myVote = ""; return; }
+  const mt = g.mt, open = t >= mt.votesAt, amAlive = alive(g, net.sessionId), voted = mt.votes[net.sessionId] || myVote;
+  $("mTitle").textContent = mt.why === "body" ? `${nameIn(g, mt.by)} found ${nameIn(g, mt.body)}'s body` : `${nameIn(g, mt.by)} called a meeting`;
+  $("mTime").textContent = open ? `Vote · ${Math.max(0, Math.ceil((g.endsAt - t) / 1000))}s` : `Voting in ${Math.ceil((mt.votesAt - t) / 1000)}s`;
+  const sig = JSON.stringify([g.mn, g.dead, Object.keys(mt.votes), open, voted, amAlive]);
+  if (sig !== meetSig) {
+    meetSig = sig;
+    const canVote = open && amAlive && !voted;
+    $("votes").innerHTML = g.ros.map((r) => `<button data-id="${esc(r.i)}" class="${g.dead.includes(r.i) ? "dead" : ""} ${voted === r.i ? "mine" : ""}" ${canVote && !g.dead.includes(r.i) ? "" : "disabled"}>
+      <span class="dot" style="background:${hsl(r.c)}"></span>${esc(r.n)}${r.i === net.sessionId ? " (you)" : ""}${mt.votes[r.i] ? '<span class="tag">VOTED</span>' : ""}</button>`).join("");
+    $("skip").disabled = !canVote; $("skip").classList.toggle("mine", voted === "skip");
+    $("skip").textContent = ATTRACT ? "Skip vote" : !amAlive ? "Ghosts can't vote" : voted ? "Vote cast" : open ? "Skip vote" : "Talk it out first…";
+    $("say").hidden = ATTRACT;
+    $("sayText").disabled = !amAlive; $("sayText").placeholder = amAlive ? "Say something…" : "Ghosts can't talk";
+  }
+  const raw = S.shared.chat;
+  if (raw !== chatRaw) {
+    chatRaw = raw;
+    const c = shared("chat", { m: 0, l: [] });
+    $("chat").innerHTML = (c.m === g.mn && c.l.length ? c.l : [["", "Who do you think it is?"]]).map(([id, text]) => id ? `<div><b style="color:${hsl(rosOf(g, id)?.c ?? 0, 10)}">${esc(nameIn(g, id))}</b>${esc(text)}</div>` : `<div class="sys">${esc(text)}</div>`).join("");
+    $("chat").scrollTop = 1e6;
+  }
+}
+function castVote(target) {
+  const g = game();
+  if (!g || g.ph !== "meet" || !alive(g, net.sessionId) || g.mt.votes[net.sessionId] || myVote || Date.now() < g.mt.votesAt) return;
+  myVote = target; meetSig = "";
+  toHost("vote", { t: target });
+  tone(440, 90);
+}
+$("votes").addEventListener("click", (e) => { const b = e.target.closest("button[data-id]"); if (b && !b.disabled) castVote(b.dataset.id); });
+$("skip").addEventListener("click", () => castVote("skip"));
+$("say").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("sayText").value.trim();
+  if (text) toHost("chat", { t: text });
+  $("sayText").value = "";
+});
+
+function renderOver(g) {
+  $("over").hidden = g.ph !== "over";
+  if (g.ph !== "over") return;
+  $("oTitle").innerHTML = g.win === "crew" ? '<span class="blue">Crew wins!</span>' : '<span class="red">Impostor wins!</span>';
+  $("oWhy").textContent = { tasks: "Every task got done.", caught: "The impostor was voted out.", kills: "The impostor took out the crew." }[g.why] || "";
+  $("oImp").innerHTML = g.imps.length ? `The impostor was ${g.imps.map((i) => dot(rosOf(g, i)?.c ?? 0) + esc(nameIn(g, i))).join(", ")}` : "";
+  $("oNext").textContent = `Next game in ${Math.max(0, Math.ceil((g.endsAt - Date.now()) / 1000))}s`;
+  $("again").textContent = g.ready.includes(net.sessionId) ? "Ready ✓" : "Play again";
+  if (overFor !== g.id) { overFor = g.id; showBoard(g); }
+}
+let board = null;
+function showBoard(g) {
+  const list = $("board"), mine = inGame(g, net.sessionId), won = mine && myRole?.g === g.id && (myRole.r === "imp") === (g.win === "imp");
+  $("oYou").textContent = !mine || ATTRACT ? "" : won ? "You won! +1 on the board." : "Your side lost this one.";
+  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
+  list.innerHTML = "<li>Loading the leaderboard…</li>";
+  (won ? board.submit(1, "inc").catch(() => null) : Promise.resolve()).then(() => board.top(10)).then(({ entries }) => {
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score} win${e.score === 1 ? "" : "s"}</span></li>`).join("") : "<li>No wins yet. Be the first.</li>";
+  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+}
+$("again").addEventListener("click", () => toHost("ready", { r: 1 }));
+$("name").addEventListener("change", () => {
+  myName = $("name").value.trim().slice(0, 14) || myName;
+  try { localStorage.setItem("mpa-name", myName); } catch {}
+  net && net.me.set("n", myName);
+});
+
+// ── INPUT ───────────────────────────────────────────────────────────────────────────
+const touchUI = matchMedia("(pointer: coarse)").matches;
+const keys = new Set();
+let useBtn = false;
+const useHeld = () => useBtn || keys.has("e") || keys.has(" ");
+const stick = { on: false, id: 0, x0: 0, y0: 0, dx: 0, dy: 0 };
+function moveInput() {
+  let x = 0, y = 0;
+  if (keys.has("a") || keys.has("arrowleft")) x--;
+  if (keys.has("d") || keys.has("arrowright")) x++;
+  if (keys.has("w") || keys.has("arrowup")) y--;
+  if (keys.has("s") || keys.has("arrowdown")) y++;
+  if (stick.on) { x = stick.dx; y = stick.dy; }
+  const l = Math.hypot(x, y);
+  return l > 1 ? [x / l, y / l] : [x, y];
+}
+addEventListener("keydown", (e) => {
+  if (e.target instanceof HTMLInputElement) return; // typing a name or a chat line
+  unlockAudio();
+  const k = e.key.toLowerCase();
+  if (!keys.has(k)) { if (k === "e" || k === " ") pressUse(); if (k === "q") tryMyKill(); if (k === "r") tryReport(); }
+  keys.add(k);
+  if (k === " " || k.startsWith("arrow")) e.preventDefault();
+});
+addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+addEventListener("blur", () => keys.clear());
+cv.addEventListener("pointerdown", (e) => {
+  e.preventDefault(); unlockAudio();
+  Object.assign(stick, { on: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 });
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", (e) => {
+  if (!stick.on || e.pointerId !== stick.id) return;
+  const dx = e.clientX - stick.x0, dy = e.clientY - stick.y0, l = Math.hypot(dx, dy);
+  const k = l < 8 ? 0 : Math.min(1, l / 50) / l;
+  stick.dx = dx * k; stick.dy = dy * k;
+});
+for (const ev of ["pointerup", "pointercancel"]) cv.addEventListener(ev, (e) => { if (e.pointerId === stick.id) Object.assign(stick, { on: false, dx: 0, dy: 0 }); });
+$("use").addEventListener("pointerdown", (e) => { e.preventDefault(); unlockAudio(); useBtn = true; pressUse(); });
+for (const ev of ["pointerup", "pointercancel", "pointerleave"]) $("use").addEventListener(ev, () => { useBtn = false; });
+$("kill").addEventListener("pointerdown", (e) => { e.preventDefault(); tryMyKill(); });
+$("report").addEventListener("pointerdown", (e) => { e.preventDefault(); tryReport(); });
+document.addEventListener("touchmove", (e) => { if (!e.target.closest("#chat")) e.preventDefault(); }, { passive: false });
+
+// ── MAIN LOOP ───────────────────────────────────────────────────────────────────────
+let last = performance.now(), lastHb = 0, lastHud = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (now - lastHb > 1000) { lastHb = now; net.me.set("hb", Date.now()); }
+  watchHost();
+  if (isHost()) hostTick(dt); else host.was = false;
+  const g = game();
+  if (g) { myTick(g, dt); effects(g); }
+  updateActors(g, dt);
+  draw(g, now);
+  if (now - lastHud > 120) { lastHud = now; hud(g); }
+  requestAnimationFrame(frame);
+}
+
+(async function start() {
+  if (ATTRACT) Object.assign(CONFIG, { seats: 8, lobbyMs: 200, introMs: 300, killCooldown: 2000, killRange: 100, reportRange: 400, talkMs: 2000, voteMs: 2800, ejectMs: 3000, overMs: 4000, botReportMs: [200, 500], botKillChance: 4 });
+  net = await connect();
+  net.onState((st) => { S = st; });
+  net.onDisconnect(() => { $("net").textContent = "Reconnecting…"; });
+  for (const [type, fn] of Object.entries(HANDLERS)) net.on(type, (msg, from) => { if (isHost() && msg) fn(from, msg); });
+  net.on("act", async (msg, from) => { // sealed to the host: only the host can open it
+    if (!msg || msg.to !== net.sessionId || !isHost()) return;
+    const d = await Seal.open(pkOf(from), msg.box);
+    if (d) onAct(from, d);
+  });
+  net.on("role", async (msg, from) => { // a player's own role, re-sent to a new host
+    if (!msg || msg.to !== net.sessionId) return;
+    const v = await Seal.open(pkOf(from), msg.box);
+    if (!v) return;
+    heard.set(from, v);
+    if (isHost()) learnRole(from, v);
+  });
+  net.on("who", (msg, from) => resendRole(from));
+  if (!net.offline && typeof MP !== "undefined") board = MP.auth({ key: MP_CONNECT.key, apiUrl: MP_CONNECT.apiUrl }).leaderboard(CONFIG.board);
+  const pk = await Seal.init().catch(() => "");
+  const taken = new Set(Object.entries(S.entities.players || {}).filter(([id]) => id !== net.sessionId).map(([, p]) => Number(p.c)));
+  myColor = COLORS.findIndex((_, i) => !taken.has(i));
+  if (myColor < 0) myColor = Math.floor(Math.random() * COLORS.length);
+  $("name").value = myName;
+  net.me.set({ n: myName, c: myColor, hb: Date.now(), pk });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

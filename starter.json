@@ -1,0 +1,21 @@
+{
+  "name": "Impostor Ship",
+  "genre": "party",
+  "dim": "2D",
+  "mode": "Party",
+  "players": "4–10",
+  "hook": "Do your tasks. Find the impostor.",
+  "how": "The crew fixes the ship. One player is secretly the impostor. Report a body or hit the button, talk it out in chat and vote someone off.",
+  "controls": "WASD or drag to walk, E or USE for tasks, Q to kill, R to report",
+  "uses": [
+    ["Hidden info", "Your role is sealed so only you can read it (the host deals, so it can too)."],
+    ["Host-run rules", "The host's browser deals roles, checks kills and counts votes; if it leaves, the next player takes over."],
+    ["Bots", "Bots walk the ship, do tasks, report bodies, chat and vote. A bot impostor hunts too."],
+    ["Leaderboard", "Games won, by each player."]
+  ],
+  "ideas": [
+    "Add a second impostor for 8 or more players",
+    "Add a sheriff role",
+    "Set it in a haunted mansion"
+  ]
+}
