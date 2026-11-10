@@ -319,7 +319,8 @@ const Seal = {
   },
   /** Seal any JSON value so only the holder of `toPub` (and you) can open it. */
   async seal(toPub, value) {
-    if (!this.on || !toPub || !this.pair) return "p:" + JSON.stringify(value);
+    if (!this.on) return "p:" + JSON.stringify(value);
+    if (!toPub || !this.pair) return ""; // never plaintext online: nobody can open an empty box
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await this.key(toPub), new TextEncoder().encode(JSON.stringify(value)));
     return b64(iv) + "." + b64(ct);
