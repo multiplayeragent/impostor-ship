@@ -35,7 +35,7 @@
   #lobby { position: fixed; left: 50%; transform: translateX(-50%); top: max(64px, calc(env(safe-area-inset-top) + 54px)); font-size: 14px; color: var(--dim); }
   #lobby input { margin-left: 8px; width: 150px; height: 40px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff14; color: #fff; padding: 0 10px; font: inherit; font-size: 16px; }
   .over { position: fixed; inset: 0; display: grid; place-items: center; background: #04060ed6; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); box-sizing: border-box; }
-  .card { width: min(720px, 96vw); max-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid #ffffff22; box-shadow: 0 20px 60px #0008; }
+  .card { width: min(720px, calc(100vw - 32px)); max-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: var(--card); border: 1px solid #ffffff22; box-shadow: 0 20px 60px #0008; }
   .card header { display: flex; align-items: baseline; gap: 10px; }
   .card h2 { margin: 0; font-size: 20px; }
   #mTime { margin-left: auto; color: var(--gold); font-weight: 800; white-space: nowrap; }
@@ -445,10 +445,10 @@ function hostTick(dt) {
   writeBots();
 }
 
-/** Humans who closed the game mid-round are out (no body). */
+/** Humans who closed the game mid-round (or whose tab stopped: no heartbeat for 3s) are out (no body). */
 function dropLeavers(g) {
-  const ps = S.entities.players || {};
-  const gone = g.ros.filter((r) => !r.b && !g.dead.includes(r.i) && !ps[r.i]).map((r) => r.i);
+  const live = new Set(livePlayers());
+  const gone = g.ros.filter((r) => !r.b && !g.dead.includes(r.i) && !live.has(r.i)).map((r) => r.i);
   if (!gone.length) return g;
   return patch({ dead: [...g.dead, ...gone], impLeft: g.impLeft - gone.filter(isImp).length });
 }
@@ -980,9 +980,10 @@ function banner(g) {
 }
 
 let meetSig = "", chatRaw = "", overFor = -1, myVote = "";
+let dropped = false; // true while the connection is down: the HUD keeps showing "Reconnecting…"
 function hud(g) {
   const n = humans().length;
-  $("net").textContent = ATTRACT ? "" : net.offline ? "Offline: playing with bots" : `Online · ${n} player${n === 1 ? "" : "s"}${isHost() ? " · you run the ship" : ""}`;
+  $("net").textContent = ATTRACT ? "" : net.offline ? "Offline: playing with bots" : dropped ? "Reconnecting…" : `Online · ${n} player${n === 1 ? "" : "s"}${isHost() ? " · you run the ship" : ""}`;
   if (!g) return;
   if (g.ph === "lobby") fixColor();
   const t = Date.now(), mine = inGame(g, net.sessionId), amAlive = alive(g, net.sessionId), imp = iAmImp(g), m = $("msg"), html = banner(g);
@@ -1126,7 +1127,7 @@ document.addEventListener("touchmove", (e) => { if (!e.target.closest("#chat")) 
 // ── MAIN LOOP ───────────────────────────────────────────────────────────────────────
 let last = performance.now(), lastHb = 0, lastHud = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; // never negative: the first frame can be stamped before `last`
   if (now - lastHb > 1000) { lastHb = now; net.me.set("hb", Date.now()); }
   watchHost();
   if (isHost()) hostTick(dt); else host.was = false;
@@ -1142,7 +1143,8 @@ function frame(now) {
   if (ATTRACT) Object.assign(CONFIG, { seats: 8, lobbyMs: 200, introMs: 300, killCooldown: 2000, killRange: 100, reportRange: 400, talkMs: 2000, voteMs: 2800, ejectMs: 3000, overMs: 4000, botReportMs: [200, 500], botKillChance: 4 });
   net = await connect();
   net.onState((st) => { S = st; });
-  net.onDisconnect(() => { $("net").textContent = "Reconnecting…"; });
+  net.onDisconnect(() => { dropped = true; $("net").textContent = "Reconnecting…"; });
+  net.onReconnect(() => { dropped = false; });
   for (const [type, fn] of Object.entries(HANDLERS)) net.on(type, (msg, from) => { if (isHost() && msg) fn(from, msg); });
   net.on("act", async (msg, from) => { // sealed to the host: only the host can open it
     if (!msg || msg.to !== net.sessionId || !isHost()) return;
