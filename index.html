@@ -56,6 +56,7 @@
   #oTitle { font-size: 28px !important; } #oWhy, #oNext { color: var(--dim); } #oImp { font-weight: 700; }
   #board { text-align: left; margin: 4px 0; padding-left: 26px; font-size: 14px; min-height: 40px; }
   #board li span { float: right; }
+  #board li.note { list-style: none; margin-left: -26px; color: var(--dim); } /* a message in place of the list: no "1." in front of it */
 </style>
 <script src="https://cdn.multiplayeragent.com/sdk/mp.global.js"></script>
 </head>
@@ -78,7 +79,7 @@
 </div></div>
 <div class="over" id="over" hidden><div class="card">
   <h2 id="oTitle"></h2><div id="oWhy"></div><div id="oImp"></div><div id="oYou" class="gold"></div>
-  <ol id="board"><li>Loading the leaderboard…</li></ol>
+  <ol id="board"><li class="note">Loading the leaderboard…</li></ol>
   <button class="go" id="again">Play again</button><div id="oNext"></div>
 </div></div>
 <script>
@@ -91,7 +92,8 @@
  *   CONNECTION .... MP_CONNECT, joining, the offline room, who is host
  *   SEALED SECRETS  the Seal helper: a role is encrypted so only its owner can read it
  *   GAME (HOST) ... phases (lobby, play, meet, eject, over), dealing roles, kills, votes, wins
- *   BOTS (HOST) ... bots walk to tasks, report bodies, chat and vote; a bot impostor hunts
+ *   BOTS (HOST) ... bots walk to tasks, report bodies, chat and vote; a witness runs to report
+ *                   (or hits the button); a bot impostor hunts
  *   ME ............ walking, tasks, kill, report, the button, opening my role
  *   DRAW .......... the ship, crewmates, bodies, the dark, the ejection
  *   SCREENS ....... HUD, meeting, results, leaderboard
@@ -451,7 +453,8 @@ function dropLeavers(g) {
   const live = new Set(livePlayers());
   const gone = g.ros.filter((r) => !r.b && !g.dead.includes(r.i) && !live.has(r.i)).map((r) => r.i);
   if (!gone.length) return g;
-  return patch({ dead: [...g.dead, ...gone], impLeft: g.impLeft - gone.filter(isImp).length });
+  const undone = gone.filter((id) => !isImp(id)).reduce((n, id) => n + CONFIG.tasksEach - (host.done.get(id)?.size || 0), 0); // a leaver's tasks can't be finished: drop them from the bar
+  return patch({ dead: [...g.dead, ...gone], impLeft: g.impLeft - gone.filter(isImp).length, tt: Math.max(g.td, g.tt - undone) });
 }
 
 /** The HOST's copy of where someone is (bots from memory, players from their entity). */
@@ -487,7 +490,7 @@ function tryKill(killer, target) {
   host.lastKill.set(killer, now);
   for (const r of g.ros) { // bots that saw it will say so at the meeting
     const p = r.b && r.i !== killer && r.i !== target && alive(g, r.i) && posOf(r.i);
-    if (p && dist(p, b) < CONFIG.vision) host.saw.set(r.i, killer);
+    if (p && dist(p, b) < CONFIG.vision) { host.saw.set(r.i, killer); if (!p.dead) Object.assign(p, { path: [], task: false, busyUntil: now + rnd(400, 1100) }); } // a witness stops, then runs to report
   }
   if (host.bots.has(killer)) Object.assign(host.bots.get(killer), { x: b.x, y: b.y, path: [] });
   if (host.bots.has(target)) Object.assign(host.bots.get(target), { dead: true, path: [], busyUntil: 0 });
@@ -560,7 +563,7 @@ function checkWin(g) {
 
 // ── BOTS (HOST) ─────────────────────────────────────────────────────────────────────
 const rnd = (a, b) => a + Math.random() * (b - a);
-const newBot = (i, s) => ({ i, x: s.x, y: s.y, f: 1, m: 0, dead: false, k: 0, path: [], busyUntil: 0, task: false, reportAt: 0, hunt: 0 });
+const newBot = (i, s) => ({ i, x: s.x, y: s.y, f: 1, m: 0, dead: false, k: 0, path: [], busyUntil: 0, task: false, button: false, reportAt: 0, hunt: 0 });
 function seatBots(g) {
   g.ros.forEach((r, i) => {
     if (!r.b) return;
@@ -591,7 +594,11 @@ function botWalk(g, b, dt, now) {
   if (!p) { b.busyUntil = now + 500; return; }
   const d = dist(b, p), step = CONFIG.speed * (b.hunt ? 1.05 : 0.8) * dt; // a hunting impostor walks faster
   if (Math.abs(p.x - b.x) > 2) b.f = p.x < b.x ? -1 : 1;
-  if (d <= step) { b.x = p.x; b.y = p.y; b.path.shift(); if (!b.path.length) b.busyUntil = now + (b.task ? rnd(1500, 3000) : rnd(300, 1400)); }
+  if (d <= step) {
+    b.x = p.x; b.y = p.y; b.path.shift();
+    if (!b.path.length && b.button) { b.button = false; onButton(b.i); if (game().ph !== "play") return; }
+    if (!b.path.length) b.busyUntil = now + (b.task ? rnd(1500, 3000) : rnd(300, 1400));
+  }
   else { b.x += ((p.x - b.x) / d) * step; b.y += ((p.y - b.y) / d) * step; b.m = 1; }
 }
 function planBot(g, b, now) {
@@ -600,6 +607,12 @@ function planBot(g, b, now) {
   if (!b.dead && isImp(b.i) && killReady(g, b.i, now) && (ATTRACT || Math.random() < 0.65)) {
     const prey = g.ros.filter((r) => alive(g, r.i) && !isImp(r.i)).map((r) => posOf(r.i)).filter(Boolean).sort((p, q) => dist(p, b) - dist(q, b))[0];
     if (prey) { to = { x: prey.x, y: prey.y }; b.hunt = now + (ATTRACT ? 500 : 1200); }
+  }
+  b.button = false;
+  if (!b.dead && !isImp(b.i) && host.saw.has(b.i) && g.bodies.length) { // a witness reports the body, or hits the button if that's nearer
+    const body = g.bodies.map((x) => ({ x: x[1], y: x[2] })).sort((p, q) => dist(p, b) - dist(q, b))[0];
+    const button = now >= g.at + CONFIG.buttonDelay && !g.em.includes(b.i) && dist(b, BUTTON) < dist(b, body);
+    to = button ? { x: BUTTON.x, y: BUTTON.y + 40 } : body; b.button = button;
   }
   if (!to && b.k < list.length) { to = { x: TASKS[list[b.k]].wx, y: TASKS[list[b.k]].wy }; b.task = true; }
   b.path = findPath(b, to || randomFloor());
@@ -1068,11 +1081,11 @@ let board = null;
 function showBoard(g) {
   const list = $("board"), mine = inGame(g, net.sessionId), won = mine && myRole?.g === g.id && (myRole.r === "imp") === (g.win === "imp");
   $("oYou").textContent = !mine || ATTRACT ? "" : won ? "You won! +1 on the board." : "Your side lost this one.";
-  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
-  list.innerHTML = "<li>Loading the leaderboard…</li>";
+  if (!board) { list.innerHTML = '<li class="note">Leaderboards need a connection.</li>'; return; }
+  list.innerHTML = '<li class="note">Loading the leaderboard…</li>';
   (won ? board.submit(1, "inc").catch(() => null) : Promise.resolve()).then(() => board.top(10)).then(({ entries }) => {
-    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score} win${e.score === 1 ? "" : "s"}</span></li>`).join("") : "<li>No wins yet. Be the first.</li>";
-  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score} win${e.score === 1 ? "" : "s"}</span></li>`).join("") : '<li class="note">No wins yet. Be the first.</li>';
+  }).catch(() => { list.innerHTML = `<li class="note">Couldn't load the leaderboard.</li>`; });
 }
 $("again").addEventListener("click", () => toHost("ready", { r: 1 }));
 $("name").addEventListener("change", () => {
@@ -1107,8 +1120,10 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 addEventListener("blur", () => keys.clear());
+cv.addEventListener("contextmenu", (e) => e.preventDefault()); // no browser menu on the ship
 cv.addEventListener("pointerdown", (e) => {
   e.preventDefault(); unlockAudio();
+  if (e.button !== 0) return; // only the main button (or a finger) drags
   Object.assign(stick, { on: true, id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 });
   cv.setPointerCapture(e.pointerId);
 });
